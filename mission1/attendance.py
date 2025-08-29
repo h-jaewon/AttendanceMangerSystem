@@ -1,54 +1,94 @@
-id1 = {}
-id_cnt = 0
+from enum import Enum
 
-# dat[사용자ID][요일]
-dat = [[0] * 100 for _ in range(100)]
-points = [0] * 100
-grade = [0] * 100
-names = [''] * 100
-wed = [0] * 100
-weeken = [0] * 100
+class Grade(Enum):
+    NORMAL = 0
+    GOLD = 1
+    SILVER = 2
 
-def input2(w, wk):
-    global id_cnt
 
-    if w not in id1:
-        id_cnt += 1
-        id1[w] = id_cnt
-        names[id_cnt] = w
+class Day(Enum):
+    MON = 0
+    TUE = 1
+    WED = 2
+    THU = 3
+    FRI = 4
+    WEEKEND = 5
 
-    id2 = id1[w]
+day_index_map = {
+    "monday": Day.MON.value,
+    "tuesday": Day.TUE.value,
+    "wednesday": Day.WED.value,
+    "thursday": Day.THU.value,
+    "friday": Day.FRI.value,
+    "saturday": Day.WEEKEND.value,
+    "sunday": Day.WEEKEND.value
+}
+GRADE = ["NORMAL", "SILVER", "GOLD"]
+player_name_id_map = {}
+player_info_list = []
+player_attendance_list = []
 
-    add_point = 0
-    index = 0
+def set_player_info(player_name):
+    if player_name not in player_name_id_map:
+        player_name_id_map[player_name] = len(player_info_list)
+        player_info_list.append({
+            "name": player_name,
+            "point": 0,
+            "grade": Grade.NORMAL
+        })
+        player_attendance_list.append([0,0,0,0,0,0])
 
-    if wk == "monday":
-        index = 0
-        add_point += 1
-    elif wk == "tuesday":
-        index = 1
-        add_point += 1
-    elif wk == "wednesday":
-        index = 2
-        add_point += 3
-        wed[id2] += 1
-    elif wk == "thursday":
-        index = 3
-        add_point += 1
-    elif wk == "friday":
-        index = 4
-        add_point += 1
-    elif wk == "saturday":
-        index = 5
-        add_point += 2
-        weeken[id2] += 1
-    elif wk == "sunday":
-        index = 6
-        add_point += 2
-        weeken[id2] += 1
 
-    dat[id2][index] += 1
-    points[id2] += add_point
+def check_attendance(player_name, attend_day):
+    player_id = player_name_id_map[player_name]
+    day_index = day_index_map[attend_day]
+    player_attendance_list[player_id][day_index] += 1
+
+
+def calc_point():
+    for player_id, attendance_info in enumerate(player_attendance_list):
+        player_info_list[player_id]["point"] = (attendance_info[Day.MON.value] +
+                                                attendance_info[Day.TUE.value] +
+                                                attendance_info[Day.WED.value]*3 +
+                                                attendance_info[Day.THU.value] +
+                                                attendance_info[Day.FRI.value] +
+                                                attendance_info[Day.WEEKEND.value]*2
+                                                )
+        if attendance_info[Day.WED.value] >= 10:
+            player_info_list[player_id]["point"] += 10
+
+        if attendance_info[Day.WEEKEND.value] >= 10:
+            player_info_list[player_id]["point"] += 10
+
+
+def set_grade():
+    for player_id, player_info in enumerate(player_info_list):
+        if player_info["point"] >= 50:
+            player_info["grade"] = Grade.GOLD
+        elif player_info["point"] >= 30:
+            player_info["grade"] = Grade.SILVER
+
+
+def print_grade():
+    for player_info in player_info_list:
+        name = player_info["name"]
+        point = player_info["point"]
+        grade = GRADE[player_info["grade"].value]
+        print(f"NAME : {name}, POINT : {point}, GRADE : {grade}", end="\n")
+
+
+def print_removed_player():
+    print("\nRemoved player")
+    print("==============")
+    for player_id, player_info in enumerate(player_info_list):
+        if player_info["grade"] != Grade.NORMAL:
+            continue
+        if player_attendance_list[player_id][Day.WED.value] != 0:
+            continue
+        if player_attendance_list[player_id][Day.WEEKEND.value]!= 0:
+            continue
+        print(player_info["name"])
+
 
 def input_file():
     try:
@@ -59,34 +99,15 @@ def input_file():
                     break
                 parts = line.strip().split()
                 if len(parts) == 2:
-                    input2(parts[0], parts[1])
+                    player_name = parts[0]
+                    attend_day = parts[1]
+                    set_player_info(player_name)
+                    check_attendance(player_name, attend_day)
 
-        for i in range(1, id_cnt + 1):
-            if dat[i][2] > 9:
-                points[i] += 10
-            if dat[i][5] + dat[i][6] > 9:
-                points[i] += 10
-
-            if points[i] >= 50:
-                grade[i] = 1
-            elif points[i] >= 30:
-                grade[i] = 2
-            else:
-                grade[i] = 0
-
-            print(f"NAME : {names[i]}, POINT : {points[i]}, GRADE : ", end="")
-            if grade[i] == 1:
-                print("GOLD")
-            elif grade[i] == 2:
-                print("SILVER")
-            else:
-                print("NORMAL")
-
-        print("\nRemoved player")
-        print("==============")
-        for i in range(1, id_cnt + 1):
-            if grade[i] not in (1, 2) and wed[i] == 0 and weeken[i] == 0:
-                print(names[i])
+        calc_point()
+        set_grade()
+        print_grade()
+        print_removed_player()
 
     except FileNotFoundError:
         print("파일을 찾을 수 없습니다.")
