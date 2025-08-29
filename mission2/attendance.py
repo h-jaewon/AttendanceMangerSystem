@@ -1,9 +1,5 @@
 from enum import Enum
-
-class Grade(Enum):
-    NORMAL = 0
-    GOLD = 1
-    SILVER = 2
+from mission2.GradeFactory import GradeFactory, Grade
 
 
 class Day(Enum):
@@ -12,105 +8,159 @@ class Day(Enum):
     WED = 2
     THU = 3
     FRI = 4
-    WEEKEND = 5
-
-day_index_map = {
-    "monday": Day.MON.value,
-    "tuesday": Day.TUE.value,
-    "wednesday": Day.WED.value,
-    "thursday": Day.THU.value,
-    "friday": Day.FRI.value,
-    "saturday": Day.WEEKEND.value,
-    "sunday": Day.WEEKEND.value
-}
-GRADE = ["NORMAL", "SILVER", "GOLD"]
-player_name_id_map = {}
-player_info_list = []
-player_attendance_list = []
-
-def set_player_info(player_name):
-    if player_name not in player_name_id_map:
-        player_name_id_map[player_name] = len(player_info_list)
-        player_info_list.append({
-            "name": player_name,
-            "point": 0,
-            "grade": Grade.NORMAL
-        })
-        player_attendance_list.append([0,0,0,0,0,0])
+    SAT = 5
+    SUN = 6
 
 
-def check_attendance(player_name, attend_day):
-    player_id = player_name_id_map[player_name]
-    day_index = day_index_map[attend_day]
-    player_attendance_list[player_id][day_index] += 1
+class Player:
+    def __init__(self, name):
+        self._name = name
+        self._point = 0
+        self._grade = "NORMAL"
+        self.week_attend_log = [0,0,0,0,0,0,0]
+
+    @property
+    def point(self):
+        return self._point
+
+    @point.setter
+    def point(self, val):
+        self._point = val
+
+    @property
+    def grade(self)->str:
+        return self._grade
+
+    @grade.setter
+    def grade(self, val):
+        self._grade = val
+
+    @property
+    def name(self):
+        return self._name
+
+    def count_attendance(self, day_index):
+        self.week_attend_log[day_index] += 1
+
+    def get_a_day_attendance(self, day:Day):
+        return self.week_attend_log[day.value]
+
+    def get_weekend_attendance(self):
+        return self.week_attend_log[Day.SAT.value] + self.week_attend_log[Day.SUN.value]
+
+    def is_player_normal_grade(self):
+        return self.grade == "NORMAL"
 
 
-def calc_point():
-    for player_id, attendance_info in enumerate(player_attendance_list):
-        player_info_list[player_id]["point"] = (attendance_info[Day.MON.value] +
-                                                attendance_info[Day.TUE.value] +
-                                                attendance_info[Day.WED.value]*3 +
-                                                attendance_info[Day.THU.value] +
-                                                attendance_info[Day.FRI.value] +
-                                                attendance_info[Day.WEEKEND.value]*2
-                                                )
-        if attendance_info[Day.WED.value] >= 10:
-            player_info_list[player_id]["point"] += 10
+class Attendance:
+    player_name_id_map = {}
+    player_info_list = []
+    player_attendance_list = []
+    def __init__(self):
+        self._player_list = []
+        self.player_name_id_map = {}
+        self._total_player = 0
+        self.removed_player_list = []
+        self.grade_system = GradeFactory()
+        self.set_grade_system()
 
-        if attendance_info[Day.WEEKEND.value] >= 10:
-            player_info_list[player_id]["point"] += 10
+    def set_grade_system(self):
+        self.grade_system.add_grade(Grade("NORMAL", 0))
+        self.grade_system.add_grade(Grade("SILVER", 30))
+        self.grade_system.add_grade(Grade("GOLD", 50))
 
-
-def set_grade():
-    for player_id, player_info in enumerate(player_info_list):
-        if player_info["point"] >= 50:
-            player_info["grade"] = Grade.GOLD
-        elif player_info["point"] >= 30:
-            player_info["grade"] = Grade.SILVER
-
-
-def print_grade():
-    for player_info in player_info_list:
-        name = player_info["name"]
-        point = player_info["point"]
-        grade = GRADE[player_info["grade"].value]
-        print(f"NAME : {name}, POINT : {point}, GRADE : {grade}", end="\n")
+    def append_new_player(self, player_name):
+        player_id = self._total_player
+        self.player_name_id_map[player_name] = player_id
+        self._player_list.append(Player(player_name))
+        self._total_player += 1
 
 
-def print_removed_player():
-    print("\nRemoved player")
-    print("==============")
-    for player_id, player_info in enumerate(player_info_list):
-        if player_info["grade"] != Grade.NORMAL:
-            continue
-        if player_attendance_list[player_id][Day.WED.value] != 0:
-            continue
-        if player_attendance_list[player_id][Day.WEEKEND.value]!= 0:
-            continue
-        print(player_info["name"])
+    def save_player_attendance(self, player_name, day):
+        day_map = {
+            "monday": Day.MON.value,
+            "tuesday": Day.TUE.value,
+            "wednesday": Day.WED.value,
+            "thursday": Day.THU.value,
+            "friday": Day.FRI.value,
+            "saturday": Day.SAT.value,
+            "sunday": Day.SUN.value
+        }
+        player_id = self.player_name_id_map[player_name]
+        player = self._player_list[player_id]
+        player.week_attend_log[day_map[day]] += 1
 
 
-def input_file():
-    try:
-        with open("../attendance_weekday_500.txt", encoding='utf-8') as f:
-            for _ in range(500):
-                line = f.readline()
-                if not line:
-                    break
-                parts = line.strip().split()
-                if len(parts) == 2:
-                    player_name = parts[0]
-                    attend_day = parts[1]
-                    set_player_info(player_name)
-                    check_attendance(player_name, attend_day)
+    def input_file(self, filename="../attendance_weekday_500.txt", read_length=500):
+        try:
+            with open(filename, encoding='utf-8') as f:
+                for _ in range(read_length):
+                    line = f.readline()
+                    parts = line.strip().split()
+                    player_name, attend_day = parts
+                    if player_name not in self.player_name_id_map:
+                        self.append_new_player(player_name)
+                    self.save_player_attendance(player_name, attend_day)
+        except FileNotFoundError:
+            print("파일을 찾을 수 없습니다.")
 
-        calc_point()
-        set_grade()
-        print_grade()
-        print_removed_player()
 
-    except FileNotFoundError:
-        print("파일을 찾을 수 없습니다.")
+    def calc_player_attendance_point(self):
+        WEEK_POINT = 1
+        WEEKEND_POINT = 2
+        WEDNSEDAY_BONUS = 2
+        SPECIAL_BONUS = 10
+        for player in self._player_list:
+            total_point = 0
+            total_point += player.get_a_day_attendance(Day.MON) * WEEK_POINT
+            total_point += player.get_a_day_attendance(Day.TUE) * WEEK_POINT
+            total_point += player.get_a_day_attendance(Day.WED) * (WEEK_POINT+WEDNSEDAY_BONUS)
+            total_point += player.get_a_day_attendance(Day.THU) * WEEK_POINT
+            total_point += player.get_a_day_attendance(Day.FRI) * WEEK_POINT
+            total_point += player.get_weekend_attendance() * WEEKEND_POINT
 
-if __name__ == "__main__":
-    input_file()
+            if player.get_a_day_attendance(Day.WED) >= 10:
+                total_point += SPECIAL_BONUS
+
+            if player.get_weekend_attendance() >= 10:
+                total_point += SPECIAL_BONUS
+
+            player.point = total_point
+
+    def set_player_grade(self):
+        for player in self._player_list:
+            player.grade = self.grade_system.get_grade(player.point)
+
+    def print_player_info(self):
+        for player in self._player_list:
+            print(f"NAME : {player.name}, POINT : {player.point}, GRADE : {player.grade}", end="\n")
+
+
+    def set_removed_player(self):
+        self.removed_player_list = []
+        for player in self._player_list:
+            if not player.is_player_normal_grade():
+                continue
+            if player.get_a_day_attendance(Day.WED) != 0:
+                continue
+            if player.get_weekend_attendance() != 0:
+                continue
+            self.removed_player_list.append(player)
+
+
+    def print_removed_player_list(self):
+        if not self.removed_player_list:
+            return
+        print("\nRemoved player")
+        print("==============")
+        for player in self.removed_player_list:
+            print(player.name)
+
+
+    def run_attendance_system_and_print_result(self, filename="../attendance_weekday_500.txt", read_length=500):
+        self.input_file(filename, read_length)
+        self.calc_player_attendance_point()
+        self.set_player_grade()
+        self.set_removed_player()
+        self.print_player_info()
+        self.print_removed_player_list()
